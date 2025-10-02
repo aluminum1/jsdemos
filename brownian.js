@@ -130,4 +130,32 @@ function SetUpKeyListeners() {
             running = false
         }
     })
+
+     // Mobile touch
+    document.addEventListener("touchstart", (e) => {
+        e.preventDefault();   // prevents accidental scroll
+        running = true;
+    });
+
+    document.addEventListener("touchend", (e) => {
+        running = false;
+    });
+
+    // Optional: also stop if finger slides off screen
+    document.addEventListener("touchcancel", (e) => {
+        running = false;
+    });
+
+    //Mouse
+     document.addEventListener("mousedown", (e) => {
+        if (e.button === 0) {  // left mouse button
+            running = true;
+        }
+    });
+
+    document.addEventListener("mouseup", (e) => {
+        if (e.button === 0) {
+            running = false;
+        }
+    });
 }
