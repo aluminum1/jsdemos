@@ -2,13 +2,62 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Demo</title>
+  <title>JS Demos by Bruce Bartlett</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      background: #f8f9fa;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      max-width: 600px;
+      margin: auto;
+    }
+    li {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    li:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+    a {
+      text-decoration: none;
+      color: #0066cc;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+    p {
+      margin: 0.5rem 0 0;
+      color: #666;
+    }
+  </style>
 </head>
 <body>
-<svg id="svgRoot" xmlns="http://www.w3.org/2000/svg"></svg>
-  <script src="assert.js"></script>
-  <script src="histogram.js"></script>
-  <script src="svg-draw.js"></script>
-  <script src="brownian.js"></script>
-  </body>
+  <h1>JavaScript Demos</h1>
+  <ul>
+    <li>
+      <a href="brownian.html">Brownian Motion Histogram</a>
+      <p>Simulates 100-step random walks and plots the distribution as a histogram. Push space or right arrow to run sim. </p>
+    </li>
+    <!-- Add more demos here -->
+    <!-- Example:
+    <li>
+      <a href="bezierdemo.html">Bézier Curve Demo</a>
+      <p>Interactive Bézier curve visualization with draggable control points.</p>
+    </li>
+    -->
+  </ul>
+</body>
 </html>
