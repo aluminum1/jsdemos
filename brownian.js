@@ -119,35 +119,22 @@ function GetRandomJump()
 }
 
 function SetUpKeyListeners() {
+    
+    // === Keyboard ===
     document.addEventListener("keydown", (e) =>  {
-        if (e.code == "ArrowRight" || e.code == "Space") {
-            running = true
+        if (e.code === "ArrowRight" || e.code === "Space") {
+            running = true;
         }
-    })
+    });
 
     document.addEventListener("keyup", (e) => {
-        if (e.code == "ArrowRight" || e.code=="Space") {
-            running = false
+        if (e.code === "ArrowRight" || e.code === "Space") {
+            running = false;
         }
-    })
-
-     // Mobile touch
-    document.addEventListener("touchstart", (e) => {
-        e.preventDefault();   // prevents accidental scroll
-        running = true;
     });
 
-    document.addEventListener("touchend", (e) => {
-        running = false;
-    });
-
-    // Optional: also stop if finger slides off screen
-    document.addEventListener("touchcancel", (e) => {
-        running = false;
-    });
-
-    //Mouse
-     document.addEventListener("mousedown", (e) => {
+    // === Mouse ===
+    svg.addEventListener("mousedown", (e) => {
         if (e.button === 0) {  // left mouse button
             running = true;
         }
@@ -158,4 +145,19 @@ function SetUpKeyListeners() {
             running = false;
         }
     });
+
+    // === Touch (mobile) ===
+    svg.addEventListener("touchstart", (e) => {
+        e.preventDefault();   // block scrolling/pinch
+        running = true;
+    }, { passive: false });
+
+    svg.addEventListener("touchend", (e) => {
+        running = false;
+    }, { passive: false });
+
+    svg.addEventListener("touchcancel", (e) => {
+        running = false;
+    }, { passive: false });
 }
+
