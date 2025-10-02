@@ -1,0 +1,103 @@
+/* 
+A bin (mybin, bin1, bin2 etc) is an object shaped like this:
+{   
+    min:  
+    max:  
+    numberInBin: 
+}
+*/
+
+
+function AddDataValue(bins, value) 
+{
+    for (let bin of bins)
+        if (value > bin.min && value < bin.max)
+        {
+            bin.numberInBin++
+            return            
+        }
+}
+
+function TotalValuesInBins(bins) 
+{
+    let count = 0;
+    bins.forEach(bin => { count += bin.numberInBin})
+}
+
+function MaxValueInBins(bins) {
+    let maxSoFar = 0;
+    for (let bin of bins)
+        if (bin.numberInBin > maxSoFar)
+            maxSoFar = bin.numberInBin
+    return maxSoFar;
+}
+
+/* A histogramView is an object shaped like this:
+{
+    bins:       bins[]
+    svgRects:
+    props:     {basePoint: , widthScale: , halfThickness: }
+}
+*/
+
+function MakeHistogramView(bins, props)
+{
+    let binHeight = bins.length > 0 ? (bins[0].max - bins[0].min) : 1;
+
+    let mergedProps = {
+        basePoint: {x: 0, y:0}, 
+        widthScale: 5, 
+        halfThickness: binHeight / 2,
+        ...props
+    }
+    
+    let svgRects = []
+    let maxValueInBins = MaxValueInBins(bins)
+    for (let bin of bins)
+    {
+        let {topLeft, bottomRight} = GetDimensions(bin, maxValueInBins, mergedProps)
+        let rect = MakeRectangle(topLeft, bottomRight, "lightgreen")
+        svgRects.push(rect)
+        svg.appendChild(rect)
+    }
+
+    return {bins, svgRects, props: mergedProps}
+}
+
+// Gets the dimensions of a bin, given the max of the values in all the bins,
+// and the props of the histogramView
+function GetDimensions(bin, maxValueInBins, props)
+{
+    let fractionOfMaxValue = maxValueInBins > 0 ? bin.numberInBin / maxValueInBins : 0
+    let {basePoint, widthScale, halfThickness} = props
+    let binMiddle = (bin.max + bin.min)/2
+    let topLeft = {
+        x: basePoint.x,
+        y: basePoint.y + binMiddle + halfThickness
+    }
+    let bottomRight = {
+        x: basePoint.x + fractionOfMaxValue * widthScale,
+        y: basePoint.y + binMiddle - halfThickness
+    }
+    return {topLeft: topLeft, bottomRight: bottomRight}
+}
+
+function RefreshSVG(histogramView) 
+{
+    let {bins, svgRects} = histogramView
+    let maxValueInBins = MaxValueInBins(histogramView.bins)
+
+    for (let i=0; i< histogramView.bins.length; i++)
+    {
+        let bin = bins[i]
+        let svgRect = svgRects[i]
+        let {topLeft, bottomRight} = GetDimensions(bin, maxValueInBins, histogramView.props)
+        let width = (bottomRight.x - topLeft.x)
+        let height = topLeft.y - bottomRight.y
+        let screenTopLeft = UserToViewportCoords(topLeft)
+        svgRect.setAttribute("x", String(screenTopLeft.x))
+        svgRect.setAttribute("y", String(screenTopLeft.y))
+        svgRect.setAttribute("width", String(width))
+        svgRect.setAttribute("height", String(height))
+    }
+}
