@@ -229,3 +229,10 @@ function DrawGrid()
     Line({x: 0, y: -max}, {x: 0, y: max}, "black", 0.04, false)
 }
 
+function userToScreen(x, y) {
+  const pt = svg.createSVGPoint();
+  pt.x = x;
+  pt.y = y;
+  const ctm = svg.getScreenCTM();
+  return pt.matrixTransform(ctm);
+}

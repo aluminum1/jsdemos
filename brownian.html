@@ -4,23 +4,54 @@
   <meta charset="UTF-8">
   <title>Demo</title>
   <style>
-    body {
-    margin: 0;
-    background: #fafafa;
-    display: flex;
-    align-items: center;      /* vertical center */
-    justify-content: center;  /* horizontal center */
-    height: 100vh;            /* full viewport height */
-  }
-#svgRoot {
-    width: 100vmin;
-    height: 100vmin;
-  }
-
+    body 
+    {
+      margin: 0;
+      background: #fafafa;
+      display: flex;
+      align-items: center;      /* vertical center */
+      justify-content: center;  /* horizontal center */
+      height: 100vh;            /* full viewport height */
+    }
+    #svgRoot 
+    {
+      width: 100vmin;
+      height: 100vmin;
+    }
+    @font-face 
+    {
+      font-family: "Latin Modern Roman";
+      src: url("fonts/LMRoman12-Regular.woff2") format("woff2");
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face 
+    {
+      font-family: "Latin Modern Roman";
+      src: url("/fonts/LMRoman12-Italic.woff2") format("woff2");
+      font-weight: 700;
+      font-style: italic;
+    }
+    @font-face 
+    {
+      font-family: "Latin Modern Roman";
+      src: url("/fonts/LMRoman12-Bold.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+    }
+    @font-face 
+    {
+      font-family: "Latin Modern Math";
+      src: url("/fonts/LMMathItalic12-Regular.woff2") format("woff2");
+      font-weight: normal;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
-<svg id="svgRoot" xmlns="http://www.w3.org/2000/svg"></svg>
+    <svg id="svgRoot" xmlns="http://www.w3.org/2000/svg">
+    </svg>
+
   <script src="assert.js"></script>
   <script src="histogram.js"></script>
   <script src="svg-draw.js"></script>

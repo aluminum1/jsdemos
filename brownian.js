@@ -3,7 +3,10 @@ const DELTA_X = USER_X_MAX / LENGTH_OF_PATH
 const DELTA_Y = USER_Y_MAX / LENGTH_OF_PATH
 const NUM_BINS = 100
 
+
 DrawGrid()
+DrawAxes()
+
 
 let curPoints = [{x: -USER_X_MAX, y: 0}]
 let curPolyLine = MakePolyLine(curPoints)
@@ -31,6 +34,11 @@ let totalSimCount = 0
 let lastFpsLog = performance.now()
 
 requestAnimationFrame(FrameDraw)
+
+
+
+
+
 
 /*
 ----------------------------
@@ -159,5 +167,127 @@ function SetUpKeyListeners() {
     svg.addEventListener("touchcancel", (e) => {
         running = false;
     }, { passive: false });
+}
+
+
+
+function DrawAxes()
+{
+    let topy   = {x: -9, y: 9};
+    let boty   = {x: -9, y: -9};
+    let leftx  = {x: -9, y: 0};
+    let rightx = {x: 2, y: 0};
+
+    let arrLen = 0.3;
+ 
+    // Main axes
+    Line(leftx, rightx, "black", 0.04, false); // X axis
+    Line(boty, topy, "black", 0.04, false);    // Y axis
+
+    // Arrowheads for +Y
+    Line({x: topy.x - arrLen, y: topy.y - arrLen}, topy, "black", 0.04, false);
+    Line({x: topy.x + arrLen, y: topy.y - arrLen}, topy, "black", 0.04, false);
+
+    // Arrowheads for -Y
+    Line({x: boty.x - arrLen, y: boty.y + arrLen}, boty, "black", 0.04, false);
+    Line({x: boty.x + arrLen, y: boty.y + arrLen}, boty, "black", 0.04, false);
+
+    // Arrowheads for +X
+    Line({x: rightx.x - arrLen, y: rightx.y + arrLen}, rightx, "black", 0.04, false);
+    Line({x: rightx.x - arrLen, y: rightx.y - arrLen}, rightx, "black", 0.04, false);
+
+    addLabel(rightx,"$x$", {dx: 0.2, dy: -0.2})
+    addLabel(topy, "$y$", {dx : 0.5, dy: -0.3})
+
+}
+
+
+function DrawGrid()
+{
+    let delta = USER_X_MAX / GRID_LINES
+    let max = USER_Y_MAX
+
+    for (let x = -max; x <= max; x+=delta )
+        Line({x: x, y: -max}, {x: x, y: max}, "grey", 0.02, false)
+
+    for (let y = -max; y <= max; y+=delta )
+        Line({x: -max, y: y}, {x: max, y: y}, "grey", 0.02, false)
+
+}
+
+// Puts text at the position. Accepts basic latex-style $..$ but only 
+// with a single subscript or superscript for now.
+function addLabel(pos, textString, props = {}) 
+{
+    let mergedProps = 
+    {
+        fontSize: 1,
+        dx: 0,
+        dy: 0,
+        ...props
+    }
+    let textSVG = document.createElementNS(SVG_NS, "text")
+    let shiftedPos= {x: pos.x + mergedProps.dx, y: pos.y + mergedProps.dy}
+    let userPos = UserToViewportCoords(shiftedPos)
+    textSVG.setAttribute("x", String(userPos.x))
+    textSVG.setAttribute("y", String(userPos.y))
+    textSVG.setAttribute("font-size", String(mergedProps.fontSize))
+
+    let splitString = textString.split("$")
+    log(splitString)
+    for (let i = 0; i < splitString.length; i++)
+    {
+        let inMathMode = (i%2 == 1)
+        if (!inMathMode)
+        {
+            let textSpanSVG = document.createElementNS(SVG_NS, "tspan")
+            textSpanSVG.setAttribute("font-family", "Latin Modern")
+            textSpanSVG.textContent = splitString[i]
+            textSVG.appendChild(textSpanSVG)
+        }
+        else 
+        {
+            let textSpanSVG = document.createElementNS(SVG_NS, "tspan")
+            textSpanSVG.setAttribute("font-family", "Latin Modern Math")
+            let math = splitString[i]
+            if (math.includes("^"))         // its a superscript string
+            {
+                log(math + " has a ^")
+                let split = math.split("^")
+                textSpanSVG.textContent = split[0]
+                textSVG.appendChild(textSpanSVG)
+
+                let superscriptSpanSVG = document.createElementNS(SVG_NS, "tspan") 
+                superscriptSpanSVG.setAttribute("font-size", "70%")
+                superscriptSpanSVG.setAttribute("baseline-shift", "45%")
+                superscriptSpanSVG.textContent = split[1]
+                textSVG.appendChild(superscriptSpanSVG)
+
+            }
+            else if (math.includes("_"))     // its a subscript string
+            {
+                log(math + " has a _")
+
+                let split = math.split("_")
+                textSpanSVG.textContent = split[0]
+                textSVG.appendChild(textSpanSVG)
+
+                let superscriptSpanSVG = document.createElementNS(SVG_NS, "tspan") 
+                superscriptSpanSVG.setAttribute("font-size", "70%")
+                superscriptSpanSVG.setAttribute("baseline-shift", "-25%")
+                superscriptSpanSVG.textContent = split[1]
+                textSVG.appendChild(superscriptSpanSVG)
+
+            }
+            else    // it is just a normal math string, no subscript or superscript
+            {
+                textSpanSVG.textContent = math
+                textSVG.appendChild(textSpanSVG)
+            }
+        
+        }
+    }
+    log(textSVG.outerHTML)
+    svg.appendChild(textSVG)
 }
 
