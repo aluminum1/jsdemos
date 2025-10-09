@@ -1,15 +1,10 @@
 export type {Point, PolyLine, PolyLineProps, SvgContext}
-export {SetSVGContext, MakeSVGContext, MakePolyLine, MakeRectangle, Rectangle, PolylinePointsString, UserToViewportCoords, DrawAxes, DrawGrid, SetBackgroundGradient, SetPoints}
+export {SetSVGContext, MakeSVGContext, MakePolyLine, MakeRectangle, Rectangle, PolylinePointsString, UserToViewBox as UserToViewportCoords, DrawAxes, DrawGrid, SetBackgroundGradient, SetPoints, Line, type CoordinateBounds}
 import{assert, log} from "./misc-tools.js"
 
 
 const SVG_NS = "http://www.w3.org/2000/svg"
 let curCtx: SvgContext
-
-let mathJaxReady = false;
-
-await preloadMathJax();
-
 
 /*
 --------------------
@@ -41,36 +36,48 @@ interface PolyLineProps
 interface SvgContext 
 {
     svg:        SVGSVGElement
-    userXMax:   number
-    userYMax:   number
     defs:       SVGDefsElement
+    bounds:     CoordinateBounds
 }
 
+interface CoordinateBounds
+{
+    xMin:   number
+    xMax:   number
+    yMin:   number
+    yMax:   number
+}
 
+async function ensureMathJaxReady(): Promise<void> {
+  // @ts-ignore
+  if (!window.MathJax) throw new Error("MathJax script not loaded at all");
 
-
-/* Preload MathJax exactly once */
-export async function preloadMathJax() {
-  if (mathJaxReady) return
-  //@ts-ignore
-  if (!window.MathJax)
-    throw new Error("MathJax not loaded. Include it before preloadMathJax().");
-  //@ts-ignore
-  await window.MathJax.startup.promise;
-  mathJaxReady = true;
+  // @ts-ignore
+  const startup = window.MathJax.startup;
+  if (startup?.promise) {
+    await startup.promise;   // waits only if still loading
+  }
 }
 
 function SetSVGContext(ctx: SvgContext)
 {
-        curCtx = ctx  
+    assert(ctx)
+    curCtx = ctx  
 }
 
-function MakeSVGContext(svg: SVGSVGElement, userXMax: number, userYMax: number) : SvgContext
+function MakeSVGContext(svg: SVGSVGElement, bounds: CoordinateBounds) : SvgContext
 {       
+        assert(svg)
         svg.ownerDocument.body.style.margin = "0"
 
-        let viewBox = "" + (-userXMax) +" "+ (-userYMax) +" "+ (2*userXMax) +" "+ (2*userYMax)
+        let viewBoxTopLeftX = bounds.xMin
+        let viewBoxTopLeftY = bounds.yMin
+        let viewBoxWidth = bounds.xMax - bounds.xMin
+        let viewBoxHeight = bounds.yMax - bounds.yMin
+
+        let viewBox = "" + viewBoxTopLeftX +" "+ viewBoxTopLeftY +" "+ viewBoxWidth +" "+ viewBoxHeight
         svg.setAttribute("viewBox", viewBox)
+        svg.setAttribute("preserveAspectRatio", "none")
 
         // Set up defs
         let defs = document.createElementNS(SVG_NS, "defs");
@@ -79,7 +86,7 @@ function MakeSVGContext(svg: SVGSVGElement, userXMax: number, userYMax: number) 
         // prevent right click making context window
         svg.addEventListener("contextmenu", (e) => e.preventDefault());    
 
-        let ctx = {svg, userXMax, userYMax, defs}
+        let ctx = {svg, defs, bounds}
 
         SetUpDropShadowFilter(ctx)
         
@@ -89,14 +96,21 @@ function MakeSVGContext(svg: SVGSVGElement, userXMax: number, userYMax: number) 
 
 function SetUpDropShadowFilter(ctx: SvgContext)
 {
+    assert(ctx)
     let filter = document.createElementNS(SVG_NS, "filter");    
     filter.setAttribute("id", "dropShadow");
     filter.setAttribute("filterUnits", "userSpaceOnUse")
-    filter.setAttribute("x", String(-2*ctx.userXMax))
-    filter.setAttribute("y", String(-2*ctx.userXMax))
-    filter.setAttribute("width", String(4*ctx.userXMax))
-    filter.setAttribute("height", String(4*ctx.userYMax))
 
+    // Drop shadows need to have a filter which takes place in a box twice the size of the viewBox?? TODO: Check this. 
+    // I've just made it the same size
+    let topLeftUser = {x: ctx.bounds.xMin, y: ctx.bounds.yMax}
+    let topLeftViewBox = UserToViewBox(topLeftUser, ctx)
+    let width = ctx.bounds.xMax - ctx.bounds.xMin
+    let height = ctx.bounds.yMax - ctx.bounds.yMin
+    filter.setAttribute("x", String(topLeftViewBox.x))
+    filter.setAttribute("y", String(topLeftViewBox.y))
+    filter.setAttribute("width", String(width))
+    filter.setAttribute("height", String(height))
 
     let feDropShadow = document.createElementNS(SVG_NS, "feDropShadow");
     feDropShadow.setAttribute("dx", "0.3");
@@ -109,12 +123,14 @@ function SetUpDropShadowFilter(ctx: SvgContext)
 
 function SetBackgroundGradient(colorBottomLeft: string, colorTopRight: string, ctx = curCtx)
 {
-    let {userXMax, userYMax, defs} = curCtx
+    assert(ctx)    
+    let {bounds, defs} = ctx
 
     let linear = document.createElementNS(SVG_NS, "linearGradient")
-    linear.setAttribute("id", "backgroundGradient");
-    let bottomLeft = UserToViewportCoords({x: -userXMax, y: -userYMax})
-    let topRight = UserToViewportCoords({x: userXMax, y: userYMax})
+    let id = ctx.svg.id + "-backgroundGradient"
+    linear.setAttribute("id", id);
+    let bottomLeft = UserToViewBox({x: bounds.xMin, y: bounds.yMin}, ctx)
+    let topRight = UserToViewBox({x: bounds.xMax, y: bounds.yMax}, ctx)
 
     linear.setAttribute("x1", String(bottomLeft.x));
     linear.setAttribute("y1", String(bottomLeft.y));
@@ -135,10 +151,10 @@ function SetBackgroundGradient(colorBottomLeft: string, colorTopRight: string, c
     defs.appendChild(linear);
 
     // Background rectangle spanning full viewport
-    let userTopLeft = {x : -userXMax, y: userYMax}
-    let userBottomRight = {x : userXMax, y: -userYMax }
-    let rect = MakeRectangle(userTopLeft, userBottomRight, "", false)
-    rect.setAttribute("fill", "url(#backgroundGradient)")
+    let userTopLeft = {x : bounds.xMin, y: bounds.yMax}
+    let userBottomRight = {x : bounds.xMax, y: bounds.yMin }
+    let rect = MakeRectangle(userTopLeft, userBottomRight, "", false, ctx)
+    rect.setAttribute("fill", `url(#${id})`)
     rect.setAttribute("stroke", "black")
     rect.setAttribute("stroke-width", "0.1")
 
@@ -147,60 +163,71 @@ function SetBackgroundGradient(colorBottomLeft: string, colorTopRight: string, c
 
 function SetBackgroundColor(color="lightgrey", gradient = {}, ctx = curCtx) 
 {
-    let {defs, userXMax, userYMax} = ctx        
+    assert(ctx)
+    let {defs, bounds} = ctx        
     // Background rectangle spanning full viewport
-    let userTopLeft = {x : -userXMax, y: userYMax}
-    let userBottomRight = {x : userXMax, y: -userYMax }
+    let userTopLeft = {x : bounds.xMin, y: bounds.yMax}
+    let userBottomRight = {x : bounds.xMax, y: bounds.yMin }
     let rect = MakeRectangle(userTopLeft, userBottomRight, color, false)
     defs.after(rect)
 }
 
 
-function MakeRectangle(topLeft: Point, bottomRight: Point , color = "blue", dropShadow = false) : SVGRectElement
+function MakeRectangle(topLeft: Point, bottomRight: Point , color = "blue", dropShadow = false, ctx = curCtx) : SVGRectElement
 {
+    assert(ctx)
     let width = (bottomRight.x - topLeft.x)
     let height = topLeft.y - bottomRight.y
-    let screenTopLeft = UserToViewportCoords(topLeft)
+    let viewBoxTopLeft = UserToViewBox(topLeft, ctx)
     let rect = document.createElementNS(SVG_NS, "rect")
-    rect.setAttribute("x", String(screenTopLeft.x))
-    rect.setAttribute("y", String(screenTopLeft.y))
+    rect.setAttribute("x", String(viewBoxTopLeft.x))
+    rect.setAttribute("y", String(viewBoxTopLeft.y))
     rect.setAttribute("width", String(width))
     assert(height >= 0)
     rect.setAttribute("height", String(height))
     rect.setAttribute("fill", color);
     if (dropShadow)
+    {
+        // TO DO - sort out dropshadows! This is a reference to the global dropshadow. Maybe go over to CSS
         rect.setAttribute("filter", "url(#dropShadow)");
+    }
     return rect
 }
 
 function Rectangle(topLeft: Point, bottomRight: Point, color = "blue", dropShadow = false, ctx = curCtx) 
 {
-    let rect = MakeRectangle(topLeft, bottomRight, color, dropShadow)
+    assert(ctx)
+    let rect = MakeRectangle(topLeft, bottomRight, color, dropShadow, ctx)
     ctx.svg.appendChild(rect);
 }
 
 
-// User coordinates go from -USERXMAX to USERXMAX in x direction
-// and from -USERYMAX to USERYMAX in y direction. Center = (0,0)
-function UserToViewportCoords(p: Point) 
+function UserToViewBox(userPoint: Point, ctx = curCtx) : Point
 {
-    const viewportX =  p.x;
-    const viewportY = -p.y;
-    return { x: viewportX, y: viewportY };
+    assert(ctx)
+    let bounds = ctx.bounds
+    let viewboxX =  userPoint.x;
+    // y goes up the page, as opposed to svg.
+    // When userpoint.y = bounds.ymax, viewbox.y should be ymin.
+    // When userpoint.y = bounds.ymin, viewbox.y should be ymax.
+    let viewboxY = bounds.yMax + bounds.yMin - userPoint.y;  
+    return { x: viewboxX, y: viewboxY };
 }
 
 
-function Line (p1: Point, p2: Point, color="blue", thickness=1, dropShadow = true, ctx = curCtx)
+// TODO: Change Line, etc to all accept props
+function Line (p1: Point, p2: Point, color="blue", thickness=1, dropShadow = false, ctx = curCtx)
 {
+    assert(ctx)
     let line = document.createElementNS(SVG_NS, "line")
     
-    let screenP1 = UserToViewportCoords(p1)
-    let screenP2 = UserToViewportCoords(p2)
+    let viewBoxP1 = UserToViewBox(p1, ctx)
+    let viewBoxP2 = UserToViewBox(p2, ctx)
 
-    line.setAttribute("x1", String(screenP1.x))
-    line.setAttribute("y1", String(screenP1.y))
-    line.setAttribute("x2", String(screenP2.x))
-    line.setAttribute("y2", String(screenP2.y))
+    line.setAttribute("x1", String(viewBoxP1.x))
+    line.setAttribute("y1", String(viewBoxP1.y))
+    line.setAttribute("x2", String(viewBoxP2.x))
+    line.setAttribute("y2", String(viewBoxP2.y))
     line.setAttribute("stroke", color)
     line.setAttribute("stroke-width", String(thickness))
 
@@ -213,15 +240,16 @@ function Line (p1: Point, p2: Point, color="blue", thickness=1, dropShadow = tru
 
 function MakePolyLine(points: Point[] = [], props: Partial<PolyLineProps> = {}, ctx = curCtx) 
 {
+    assert(ctx)
     let mergedProps = {
         color: "blue", 
         thickness: 0.2, 
-        dropShadow: true,
+        dropShadow: false,
         ...props
     }
 
     let polyLineSVG = document.createElementNS(SVG_NS, "polyline")
-    let pointsString = PolylinePointsString(points)
+    let pointsString = PolylinePointsString(points, ctx)
     polyLineSVG.setAttribute("points", pointsString)
     polyLineSVG.setAttribute("stroke", mergedProps.color)
     polyLineSVG.setAttribute("stroke-width", String(mergedProps.thickness))
@@ -233,55 +261,58 @@ function MakePolyLine(points: Point[] = [], props: Partial<PolyLineProps> = {}, 
 }
 
 
-function PolylinePointsString(points: Point[])
+function PolylinePointsString(points: Point[], ctx = curCtx)
 {
-    let viewPortPoints = points.map(p => UserToViewportCoords(p))
+    assert(ctx)
+    let viewPortPoints = points.map(p => UserToViewBox(p, ctx))
     let pointsString = viewPortPoints.map(p => `${p.x},${p.y}`).join(" ")
     return pointsString
 }
 
 
-function SetPoints(polyLine: PolyLine, points: Point[])
+function SetPoints(polyLine: PolyLine, points: Point[], ctx = curCtx)
 {
+    assert(ctx)
     polyLine.points = points
-    let pointsString = PolylinePointsString(points)
+    let pointsString = PolylinePointsString(points, ctx)
     polyLine.polyLineSVG.setAttribute("points", pointsString)
 }
 
 
-function AddPoint(polyLine: PolyLine, point: Point) 
+function AddPoint(polyLine: PolyLine, point: Point, ctx = curCtx) 
 {
+    assert(ctx)
     polyLine.points.push(point)
-    let pointsString = PolylinePointsString(polyLine.points)
+    let pointsString = PolylinePointsString(polyLine.points, ctx)
     polyLine.polyLineSVG.setAttribute("points", pointsString)
 } 
 
 
-function DrawGrid(numGridLinesX: number, numGridLinesY: number, ctx = curCtx)
+function DrawGrid(ctx = curCtx, densityGridLinesX = 1, densityGridLinesY = 1)
 {
-    let {userXMax, userYMax} = curCtx
-    let deltaX = userXMax / numGridLinesX
-    let deltaY = userYMax / numGridLinesY
+    assert(ctx)
+    let {bounds} = ctx
+    let width = bounds.xMax - bounds.xMin
+    let height = bounds.yMax - bounds.yMin
+    let deltaX = 1/densityGridLinesX
+    let deltaY = 1/densityGridLinesY
 
-    let maxX = userXMax
-    let maxY = userYMax
 
-    // TODO: Change Line, etc to all accept props
+    for (let x = bounds.xMin; x <= bounds.xMax; x += deltaX )
+        Line({x: x, y: bounds.yMin}, {x: x, y: bounds.yMax}, "grey", 0.02, false, ctx)
 
-    for (let x = -maxX; x <= maxX; x+=deltaX )
-        Line({x: x, y: -maxY}, {x: x, y: maxY}, "grey", 0.02, false, ctx)
-
-    for (let y = -maxY; y <= maxY; y+=deltaY )
-        Line({x: -maxX, y: y}, {x: maxX, y: y}, "grey", 0.02, false, ctx)
+    for (let y = bounds.yMin; y <= bounds.yMax; y+=deltaY )
+        Line({x: bounds.xMin, y: y}, {x: bounds.xMax, y: y}, "grey", 0.02, false, ctx)
 
 }
 
 function DrawAxes(ctx = curCtx)
 {
-    let topy   = {x: 0, y: 9};
-    let boty   = {x: 0, y: -9};
-    let leftx  = {x: -9, y: 0};
-    let rightx = {x: 2, y: 0};
+    assert(ctx)
+    let topy   = {x: 0, y: ctx.bounds.yMax};
+    let boty   = {x: 0, y: ctx.bounds.yMin};
+    let leftx  = {x: ctx.bounds.xMin, y: 0};
+    let rightx = {x: ctx.bounds.xMax, y: 0};
 
     let arrLen = 0.3;
 
@@ -301,24 +332,16 @@ function DrawAxes(ctx = curCtx)
     Line({x: rightx.x - arrLen, y: rightx.y + arrLen}, rightx, "black", 0.04, false, ctx);
     Line({x: rightx.x - arrLen, y: rightx.y - arrLen}, rightx, "black", 0.04, false, ctx);
 
-    addLaTeXLabel(rightx,"x", {exHeight: 0.5, dx: 0.5, dy: 0})
-    addLaTeXLabel(topy, "y", {exHeight: 0.5, dx : 0.5, dy: -0.3})
+    addLaTeXLabel(rightx,"x", {exHeight: 0.5, dx: 0.5, dy: 0}, ctx)
+    addLaTeXLabel(topy, "y", {exHeight: 0.5, dx : 0.5, dy: -0.3}, ctx)
 
 }
 
-
-function userToScreen(x: number, y: number, ctx = curCtx) 
+async function addLaTeXLabel(pos: Point, label: string, props = {}, ctx = curCtx)
 {
-    const pt = ctx.svg.createSVGPoint();
-    pt.x = x;
-    pt.y = y;
-    const ctm = ctx.svg.getScreenCTM();
-    return pt.matrixTransform(ctm!);
-}
+    assert(ctx)
+    await ensureMathJaxReady()
 
-
-function addLaTeXLabel(pos: Point, label: string, props = {}, ctx = curCtx)
-{
     let mergedProps =
     {
         exHeight: 1,
@@ -343,16 +366,16 @@ function addLaTeXLabel(pos: Point, label: string, props = {}, ctx = curCtx)
     let widthInUserViewport = scale * width
     let heightInUserViewport = scale * height
     // TODO: Fix this so it is in user coordinate system
-    let posVP = UserToViewportCoords(pos)
-    let xTranslate = posVP.x - widthInUserViewport/2 + mergedProps.dx
-    let yTranslate = posVP.y + heightInUserViewport/2 + svgVerticalAlign*wantedXHeightInUserViewport - mergedProps.dy
+    let posViewBox = UserToViewBox(pos, ctx)
+    let xTranslate = posViewBox.x - widthInUserViewport/2 + mergedProps.dx
+    let yTranslate = posViewBox.y + heightInUserViewport/2 + svgVerticalAlign*wantedXHeightInUserViewport - mergedProps.dy
     g.setAttribute("transform", "translate(" + xTranslate + ", " + yTranslate + ") scale(" + scale + ")");
     
 
     // move all MathJax SVG children into the group
     g.append(...mathSVG.childNodes)
     // append the group into your own SVG
-    curCtx.svg.appendChild(g);
+    ctx.svg.appendChild(g);
 
 }
 

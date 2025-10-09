@@ -1,25 +1,17 @@
-export { AddDataValue, TotalValuesInBins, MaxValueInBins, MakeHistogramView, GetDimensions, RefreshSVG };
+export { AddDataValue, MakeHistogramView, GetDimensions, RefreshSVG };
 import { MakeRectangle, UserToViewportCoords } from "./svg-draw.js";
 import { assert } from "./misc-tools.js";
-function AddDataValue(bins, value) {
-    for (let bin of bins)
+function AddDataValue(histogram, value) {
+    for (let bin of histogram.bins)
         if (value > bin.min && value < bin.max) {
             bin.numberInBin++;
+            histogram.totalValuesInBins++;
             return;
         }
 }
-function TotalValuesInBins(bins) {
-    let count = 0;
-    bins.forEach(bin => { count += bin.numberInBin; });
-}
-function MaxValueInBins(bins) {
-    let maxSoFar = 0;
-    for (let bin of bins)
-        if (bin.numberInBin > maxSoFar)
-            maxSoFar = bin.numberInBin;
-    return maxSoFar;
-}
-function MakeHistogramView(bins, props = {}, ctx) {
+// It will make a histogramView, drawn such that the area of each bin is equal to the fraction of data points it contains
+function MakeHistogramView(histogram, props = {}, ctx) {
+    let bins = histogram.bins;
     assert(bins.length >= 1);
     let binHeight = bins.length > 0 ? (bins[0].max - bins[0].min) : 1;
     let mergedProps = {
@@ -29,42 +21,42 @@ function MakeHistogramView(bins, props = {}, ctx) {
         ...props
     };
     let svgRects = [];
-    let maxValueInBins = MaxValueInBins(bins);
     for (let bin of bins) {
-        let { topLeft, bottomRight } = GetDimensions(bin, maxValueInBins, mergedProps);
-        let rect = MakeRectangle(topLeft, bottomRight, "lightgreen", false);
+        let { topLeft, bottomRight } = GetDimensions(bin, histogram, mergedProps);
+        let rect = MakeRectangle(topLeft, bottomRight, "lightgreen", false, ctx);
         svgRects.push(rect);
         ctx.svg.appendChild(rect);
     }
-    return { bins, svgRects, props: mergedProps };
+    return { histogram, svgRects, props: mergedProps };
 }
-// Gets the dimensions of a bin, given the max of the values in all the bins,
-// and the props of the histogramView
-function GetDimensions(bin, maxValueInBins, props) {
-    let fractionOfMaxValue = maxValueInBins > 0 ? bin.numberInBin / maxValueInBins : 0;
+// Gets the dimensions of a bin in a histogram given the props of the histogramView
+function GetDimensions(bin, histogram, props) {
+    let fractionOfTotalValues = histogram.totalValuesInBins > 0 ? bin.numberInBin / histogram.totalValuesInBins : 0;
     let { basePoint, widthScale, halfThickness } = props;
     let binMiddle = (bin.max + bin.min) / 2;
+    let binWidth = bin.max - bin.min;
     let topLeft = {
         x: basePoint.x,
         y: basePoint.y + binMiddle + halfThickness
     };
     let bottomRight = {
-        x: basePoint.x + fractionOfMaxValue * widthScale,
+        x: basePoint.x + widthScale * fractionOfTotalValues / binWidth,
         y: basePoint.y + binMiddle - halfThickness
     };
     return { topLeft: topLeft, bottomRight: bottomRight };
 }
-function RefreshSVG(histogramView) {
-    let { bins, svgRects } = histogramView;
-    let maxValueInBins = MaxValueInBins(histogramView.bins);
-    for (let i = 0; i < histogramView.bins.length; i++) {
+function RefreshSVG(histogramView, ctx) {
+    assert(ctx);
+    let { histogram, svgRects, props } = histogramView;
+    let bins = histogramView.histogram.bins;
+    for (let i = 0; i < bins.length; i++) {
         let bin = bins[i];
         assert(bins.length = svgRects.length);
         let svgRect = svgRects[i];
-        let { topLeft, bottomRight } = GetDimensions(bin, maxValueInBins, histogramView.props);
+        let { topLeft, bottomRight } = GetDimensions(bin, histogram, props);
         let width = (bottomRight.x - topLeft.x);
         let height = topLeft.y - bottomRight.y;
-        let screenTopLeft = UserToViewportCoords(topLeft);
+        let screenTopLeft = UserToViewportCoords(topLeft, ctx);
         svgRect.setAttribute("x", String(screenTopLeft.x));
         svgRect.setAttribute("y", String(screenTopLeft.y));
         svgRect.setAttribute("width", String(width));
