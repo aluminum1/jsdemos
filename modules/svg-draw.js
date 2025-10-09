@@ -214,8 +214,8 @@ function DrawAxes(ctx = curCtx) {
     // Arrowheads for +X
     Line({ x: rightx.x - arrLen, y: rightx.y + arrLen }, rightx, "black", 0.04, false, ctx);
     Line({ x: rightx.x - arrLen, y: rightx.y - arrLen }, rightx, "black", 0.04, false, ctx);
-    addLaTeXLabel(rightx, "x", { exHeight: 0.5, dx: 0.5, dy: 0 }, ctx);
-    addLaTeXLabel(topy, "y", { exHeight: 0.5, dx: 0.5, dy: -0.3 }, ctx);
+    // addLabel(rightx,"a", {exHeight: 0.5, dx: 0.5, dy: 0}, ctx)
+    // addLabel(topy, "b", {exHeight: 0.5, dx : 0.5, dy: -1}, ctx)
 }
 async function addLaTeXLabel(pos, label, props = {}, ctx = curCtx) {
     assert(ctx);
@@ -248,5 +248,72 @@ async function addLaTeXLabel(pos, label, props = {}, ctx = curCtx) {
     g.append(...mathSVG.childNodes);
     // append the group into your own SVG
     ctx.svg.appendChild(g);
+}
+// Puts text at the position in the user coordinate system. Accepts basic latex-style $..$ but only 
+// with a single subscript or superscript for now.
+function addLabel(pos, textString, props = {}, ctx = curCtx) {
+    assert(ctx);
+    let mergedProps = {
+        fontSize: 1,
+        dx: 0,
+        dy: 0,
+        ...props
+    };
+    let textSVG = document.createElementNS(SVG_NS, "text");
+    let shiftedPos = { x: pos.x + mergedProps.dx, y: pos.y + mergedProps.dy };
+    let userPos = UserToViewBox(shiftedPos, ctx);
+    textSVG.setAttribute("x", String(userPos.x));
+    textSVG.setAttribute("y", String(userPos.y));
+    textSVG.setAttribute("font-size", String(mergedProps.fontSize));
+    let splitString = textString.split("$");
+    log(splitString);
+    for (let i = 0; i < splitString.length; i++) {
+        let inMathMode = (i % 2 == 1);
+        if (!inMathMode) {
+            let textSpanSVG = document.createElementNS(SVG_NS, "tspan");
+            textSpanSVG.setAttribute("font-family", "Latin Modern");
+            assert(splitString[i]);
+            textSpanSVG.textContent = splitString[i];
+            textSVG.appendChild(textSpanSVG);
+        }
+        else {
+            let textSpanSVG = document.createElementNS(SVG_NS, "tspan");
+            textSpanSVG.setAttribute("font-family", "Latin Modern Math");
+            let math = splitString[i];
+            assert(math);
+            if (math.includes("^")) // its a superscript string
+             {
+                log(math + " has a ^");
+                let split = math.split("^");
+                textSpanSVG.textContent = split[0];
+                textSVG.appendChild(textSpanSVG);
+                let superscriptSpanSVG = document.createElementNS(SVG_NS, "tspan");
+                superscriptSpanSVG.setAttribute("font-size", "70%");
+                superscriptSpanSVG.setAttribute("baseline-shift", "45%");
+                superscriptSpanSVG.textContent = split[1];
+                textSVG.appendChild(superscriptSpanSVG);
+            }
+            else if (math.includes("_")) // its a subscript string
+             {
+                log(math + " has a _");
+                let split = math.split("_");
+                assert(split[0]);
+                textSpanSVG.textContent = split[0];
+                textSVG.appendChild(textSpanSVG);
+                let superscriptSpanSVG = document.createElementNS(SVG_NS, "tspan");
+                superscriptSpanSVG.setAttribute("font-size", "70%");
+                superscriptSpanSVG.setAttribute("baseline-shift", "-25%");
+                assert(split[1]);
+                superscriptSpanSVG.textContent = split[1];
+                textSVG.appendChild(superscriptSpanSVG);
+            }
+            else // it is just a normal math string, no subscript or superscript
+             {
+                textSpanSVG.textContent = math;
+                textSVG.appendChild(textSpanSVG);
+            }
+        }
+    }
+    ctx.svg.appendChild(textSVG);
 }
 //# sourceMappingURL=svg-draw.js.map

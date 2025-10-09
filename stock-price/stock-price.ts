@@ -234,6 +234,14 @@ function GetRandomBrownianJump() : number
     return randomNormal(0, DELTA_T)
 }
 
+function DoWorkForOneKeypress()
+{
+    SimulateOneTick()
+    SetPoints(brownianCurPolyLine, brownianCurPoints, brownianCtx)
+    SetPoints(stockCurPolyLine, stockCurPoints, stockCtx)
+    RefreshSVG(brownianHistogramView, brownianCtx)
+    RefreshSVG(stockHistogramView, stockCtx)
+}
 
 function SetUpKeyListeners() 
 {
@@ -241,17 +249,9 @@ function SetUpKeyListeners()
     // === Keyboard ===
     document.addEventListener("keydown", (e) =>  {
         if (e.code === "ArrowRight")
-        {
-            SimulateOneTick()
-            SetPoints(brownianCurPolyLine, brownianCurPoints, brownianCtx)
-            SetPoints(stockCurPolyLine, stockCurPoints, stockCtx)
-            RefreshSVG(brownianHistogramView, brownianCtx)
-            RefreshSVG(stockHistogramView, stockCtx)
-        }
+            DoWorkForOneKeypress()
         else if (e.code === "Space") 
-        {
             start()            
-        }
     });
 
     document.addEventListener("keyup", (e) => {
@@ -260,50 +260,46 @@ function SetUpKeyListeners()
         }
     });
 
-    // // === Mouse ===
-    // ctx.svg.addEventListener("mousedown", (e) => {
-    //     if (e.button == 0) {  // left mouse button
-    //         SimulateOneTick()
-    //     }
-    //     else if (e.button == 2) // right mouse button
-    //     {
-    //         log("mouse button 2 mousedown")
-    //         state.running = true
-    //     }
-    // });
+    // === Mouse ===
+    document.addEventListener("mousedown", (e) => {
+        if (e.button == 0) {  // left mouse button
+            DoWorkForOneKeypress()
+        }
+        else if (e.button == 2) // right mouse button
+        {
+            e.preventDefault()
+            start()
+        }
+    });
 
-    // document.addEventListener("mouseup", (e) => {
-    //     if (e.button == 2) {
-    //         e.preventDefault()
-    //         log("mouse button 2 mouseup")
-    //         running = false;
-    //     }
-    //     if (e.button == 1) {
-    //         log("mouse button 1 mouseup")
-    //     }
-    // });
+    document.addEventListener("mouseup", (e) => {
+        if (e.button == 2) {
+            e.preventDefault()
+            stop()
+        }
+    });
 
-    // // === Touch (mobile) ===
-    // ctx.svg.addEventListener("touchstart", (e) => {
-    //     e.preventDefault();   // block scrolling/pinch
-    //     let numTouches = e.touches.length
-    //     if (numTouches == 1)
-    //     {
-    //         SimulateOneTick()
-    //     }
-    //     else if (numTouches == 2)
-    //     {
-    //         state.running = true
-    //     }
-    // }, { passive: false });
+    // === Touch (mobile) ===
+    document.addEventListener("touchstart", (e) => {
+        e.preventDefault();   // block scrolling/pinch
+        let numTouches = e.touches.length
+        if (numTouches == 1)
+        {
+            DoWorkForOneKeypress()
+        }
+        else if (numTouches == 2)
+        {
+            start()
+        }
+    }, { passive: false });
 
-    // ctx.svg.addEventListener("touchend", (e) => {
-    //     running = false;
-    // }, { passive: false });
+    document.addEventListener("touchend", (e) => {
+        stop()
+    }, { passive: false });
 
-    // ctx.svg.addEventListener("touchcancel", (e) => {
-    //     state.running = false;
-    // }, { passive: false });
+    document.addEventListener("touchcancel", (e) => {
+        stop()
+    }, { passive: false });
 }
 
 
